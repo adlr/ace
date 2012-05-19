@@ -158,7 +158,7 @@
 }
 
 .ace_hidden-cursors .ace_cursor {
-    opacity: 0.2;
+    opacity: 0.0;
 }
 
 .ace_smooth-blinking .ace_cursor {
