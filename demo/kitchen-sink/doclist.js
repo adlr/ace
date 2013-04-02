@@ -54,6 +54,7 @@ function initDoc(file, path, doc) {
     var mode = modelist.getModeFromPath(path);
     session.modeName = mode.name;
     session.setMode(mode.mode);
+    return session;
 }
 
 
@@ -76,6 +77,7 @@ var docs = {
     "docs/dart.dart": "Dart",
     "docs/diff.diff": "Diff",
     "docs/dot.dot": "Dot",
+    "docs/freemarker.ftl" : "FreeMarker",
     "docs/glsl.glsl": "Glsl",
     "docs/golang.go": "Go",
     "docs/groovy.groovy": "Groovy",
@@ -90,16 +92,21 @@ var docs = {
     "docs/latex.tex": {name: "LaTeX", wrapped: true},
     "docs/less.less": "LESS",
     "docs/lisp.lisp": "Lisp",
+    "docs/lsl.lsl": "LSL",
     "docs/scheme.scm": "Scheme",
+    "docs/livescript.ls": "LiveScript",
     "docs/liquid.liquid": "Liquid",
+    "docs/logiql.logic": "LogiQL",
     "docs/lua.lua": "Lua",
     "docs/lucene.lucene": "Lucene",
     "docs/luapage.lp": "LuaPage",
     "docs/Makefile": "Makefile",
     "docs/markdown.md": {name: "Markdown", wrapped: true},
+    "docs/tinymush.mc": {name: "TinyMUSH"},
     "docs/objectivec.m": {name: "Objective-C"},
     "docs/ocaml.ml": "OCaml",
     "docs/OpenSCAD.scad": "OpenSCAD",
+    "docs/pascal.pas": "Pascal",
     "docs/perl.pl": "Perl",
     "docs/pgsql.pgsql": {name: "pgSQL", wrapped: true},
     "docs/php.php": "PHP",
@@ -113,6 +120,7 @@ var docs = {
     "docs/abap.abap": "SAP - ABAP",
     "docs/scala.scala": "Scala",
     "docs/scss.scss": "SCSS",
+    "docs/sass.sass": "SASS",
     "docs/sh.sh": "SH",
     "docs/stylus.styl": "Stylus",
     "docs/sql.sql": {name: "SQL", wrapped: true},
@@ -121,6 +129,7 @@ var docs = {
     "docs/tex.tex": "Tex",
     "docs/textile.textile": {name: "Textile", wrapped: true},
     "docs/tmSnippet.tmSnippet": "tmSnippet",
+    "docs/toml.toml": "TOML",
     "docs/typescript.ts": "Typescript",
     "docs/vbscript.vbs": "VBScript",
     "docs/xml.xml": "XML",

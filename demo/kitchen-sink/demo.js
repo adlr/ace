@@ -52,6 +52,8 @@ var Renderer = require("ace/virtual_renderer").VirtualRenderer;
 var Editor = require("ace/editor").Editor;
 var MultiSelect = require("ace/multi_select").MultiSelect;
 
+var whitespace = require("ace/ext/whitespace");
+
 var doclist = require("./doclist");
 var modelist = require("./modelist");
 var layout = require("./layout");
@@ -61,6 +63,10 @@ var saveOption = util.saveOption;
 var fillDropdown = util.fillDropdown;
 var bindCheckbox = util.bindCheckbox;
 var bindDropdown = util.bindDropdown;
+
+var ElasticTabstopsLite = require("ace/ext/elastic_tabstops_lite").ElasticTabstopsLite;
+
+var IncrementalSearch = require("ace/incremental_search").IncrementalSearch;
 
 /*********** create editor ***************************/
 var container = document.getElementById("editor-container");
@@ -90,6 +96,12 @@ var cmdLine = new layout.singleLineEditor(consoleEl);
 cmdLine.editor = env.editor;
 env.editor.cmdLine = cmdLine;
 
+env.editor.showCommandLine = function(val) {
+    this.cmdLine.focus();
+    if (typeof val == "string")
+        this.cmdLine.setValue(val, 1);
+};
+
 /**
  * This demonstrates how you can define commands and bind shortcuts to them.
  */
@@ -108,20 +120,21 @@ env.editor.commands.addCommands([{
             editor.gotoLine(line);
     },
     readOnly: true
-}/*, {
-    name: "find",
-    bindKey: {win: "Ctrl-F", mac: "Command-F"},
+}, {
+    name: "snippet",
+    bindKey: {win: "Alt-C", mac: "Command-Alt-C"},
     exec: function(editor, needle) {
         if (typeof needle == "object") {
-            var arg = this.name + " " + editor.getCopyText();
-            editor.cmdLine.setValue(arg, 1);
+            editor.cmdLine.setValue("snippet ", 1);
             editor.cmdLine.focus();
             return;
         }
-        editor.find(needle);
+        var s = SnippetManager.getSnippetByName(needle, editor);
+        if (s)
+            SnippetManager.insertSnippet(editor, s.content);
     },
     readOnly: true
-}*/, {
+}, {
     name: "focusCommandLine",
     bindKey: "shift-esc",
     exec: function(editor, needle) { editor.cmdLine.focus(); },
@@ -139,6 +152,9 @@ env.editor.commands.addCommands([{
     },
     readOnly: true
 }]);
+
+
+env.editor.commands.addCommands(whitespace.commands);
 
 cmdLine.commands.bindKeys({
     "Shift-Return|Ctrl-Return|Alt-Return": function(cmdLine) { cmdLine.insert("\n"); },
@@ -160,7 +176,7 @@ commands.addCommand({
     exec: function() {alert("Fake Save File");}
 });
 
-var keybindings = {    
+var keybindings = {
     ace: null, // Null = use "default" keymapping
     vim: require("ace/keyboard/vim").handler,
     emacs: "ace/keyboard/emacs",
@@ -223,6 +239,7 @@ bindDropdown("doc", function(name) {
         if (!session)
             return;
         session = env.split.setSession(session);
+        whitespace.detectIndentation(session);
         updateUIEditorOptions();
         env.editor.focus();
     });
@@ -360,30 +377,45 @@ bindCheckbox("read_only", function(checked) {
     env.editor.setReadOnly(checked);
 });
 
-var secondSession = null;
 bindDropdown("split", function(value) {
     var sp = env.split;
     if (value == "none") {
-        if (sp.getSplits() == 2) {
-            secondSession = sp.getEditor(1).session;
-        }
         sp.setSplits(1);
     } else {
         var newEditor = (sp.getSplits() == 1);
-        if (value == "below") {
-            sp.setOrientation(sp.BELOW);
-        } else {
-            sp.setOrientation(sp.BESIDE);
-        }
+        sp.setOrientation(value == "below" ? sp.BELOW : sp.BESIDE);
         sp.setSplits(2);
 
         if (newEditor) {
-            var session = secondSession || sp.getEditor(0).session;
+            var session = sp.getEditor(0).session;
             var newSession = sp.setSession(session, 1);
             newSession.name = session.name;
         }
     }
 });
+
+
+bindCheckbox("elastic_tabstops", function(checked) {
+    env.editor.setOption("useElasticTabstops", checked);
+});
+
+var iSearchCheckbox = bindCheckbox("isearch", function(checked) {
+    env.editor.setOption("useIncrementalSearch", checked);
+});
+
+env.editor.addEventListener('incrementalSearchSettingChanged', function(event) {
+    iSearchCheckbox.checked = event.isEnabled;
+});
+
+
+function synchroniseScrolling() {
+    var s1 = env.split.$editors[0].session;
+    var s2 = env.split.$editors[1].session;
+    s1.on('changeScrollTop', function(pos) {s2.setScrollTop(pos)});
+    s2.on('changeScrollTop', function(pos) {s1.setScrollTop(pos)});
+    s1.on('changeScrollLeft', function(pos) {s2.setScrollLeft(pos)});
+    s2.on('changeScrollLeft', function(pos) {s1.setScrollLeft(pos)});
+}
 
 bindCheckbox("highlight_token", function(checked) {
     var editor = env.editor;
@@ -397,7 +429,9 @@ bindCheckbox("highlight_token", function(checked) {
 
 /************** dragover ***************************/
 event.addListener(container, "dragover", function(e) {
-    return event.preventDefault(e);
+    var types = e.dataTransfer.types;
+    if (types && Array.prototype.indexOf.call(types, 'Files') !== -1)
+        return event.preventDefault(e);
 });
 
 event.addListener(container, "drop", function(e) {
@@ -427,5 +461,55 @@ event.addListener(container, "drop", function(e) {
 var StatusBar = require("./statusbar").StatusBar;
 new StatusBar(env.editor, cmdLine.container);
 
-});
 
+var Emmet = require("ace/ext/emmet");
+net.loadScript("https://rawgithub.com/nightwing/emmet-core/master/emmet.js", function() {
+    Emmet.setCore(window.emmet);
+    env.editor.setOption("enableEmmet", true);
+})
+
+
+require("ace/placeholder").PlaceHolder;
+
+var SnippetManager = require("ace/snippets").SnippetManager
+var jsSnippets = require("ace/snippets/javascript");
+window.SnippetManager = SnippetManager
+saveSnippets()
+
+function saveSnippets() {
+    jsSnippets.snippets = SnippetManager.parseSnippetFile(jsSnippets.snippetText);
+    SnippetManager.snipp
+    SnippetManager.register(jsSnippets.snippets, "javascript")
+}
+
+env.editSnippets = function() {
+    var sp = env.split;
+    if (sp.getSplits() == 2) {
+        sp.setSplits(1);
+        return;
+    }
+    sp.setSplits(1);
+    sp.setSplits(2);
+    sp.setOrientation(sp.BESIDE);
+    var editor = sp.$editors[1]
+    if (!env.snippetSession) {
+        var file = jsSnippets.snippetText;
+        env.snippetSession = doclist.initDoc(file, "", {});
+        env.snippetSession.setMode("ace/mode/tmsnippet");
+        env.snippetSession.setUseSoftTabs(false);
+    }
+    editor.on("blur", function() {
+        jsSnippets.snippetText = editor.getValue();
+        saveSnippets();
+    })
+    editor.setSession(env.snippetSession, 1);
+    editor.focus();
+}
+
+ace.commands.bindKey("Tab", function(editor) {
+    var success = SnippetManager.expandWithTab(editor);
+    if (!success)
+        editor.execCommand("indent");
+})
+
+});
